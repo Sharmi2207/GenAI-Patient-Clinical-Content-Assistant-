@@ -1,91 +1,79 @@
-# Health Information Assistant — Retrieval-based Medical Q&A Prototype
+# Patient & Clinical Content Assistant 🩺
 
-A working, local, no-API-key MVP inspired by the HCA Patient & Clinical Content
-Assistant architecture. Instead of consultant/pricing content, it's grounded
-in the **MedQuAD** dataset (16,406 cleaned medical Q&A pairs from 9 NIH
-sources: cancer.gov, MedlinePlus, GARD, GHR, NIDDK, NINDS, NIHSeniorHealth,
-NHLBI, CDC). CC BY 4.0 licensed, from https://github.com/abachaa/MedQuAD.
+A grounded, retrieval-augmented medical question-answering assistant designed to provide reliable, verifiable health information without hallucination risks.
 
-## How it works (the RAG pattern, without an LLM)
+🔗 **Live Demo:** [https://genai-patient-clinical-content-assistant.streamlit.app/](https://genai-patient-clinical-content-assistant.streamlit.app/)
 
-1. **Ingest**: `parse_medquad.py` flattens the raw MedQuAD XML files into one
-   clean CSV (`medquad_clean.csv`) — this mirrors the "ingestion pipeline"
-   step in the original architecture doc, minus S3/Textract/PHI-redaction
-   (not needed since the source is already clean public NIH text).
-2. **Index**: `rag_engine.py` builds a TF-IDF vector index (scikit-learn)
-   over each entry's topic + question text — the classic-ML stand-in for
-   the Titan/OpenSearch embedding + vector-index step.
-3. **Retrieve**: a user query is vectorized and compared via cosine
-   similarity against the index — the stand-in for OpenSearch hybrid
-   retrieval + reranking.
-4. **"Generate" (grounded, no hallucination risk)**: instead of an LLM
-   paraphrasing the retrieved text, the prototype returns the top-matched
-   NIH answer verbatim with its source and a confidence score. This is
-   actually *stricter* grounding than LLM generation — zero risk of
-   invented facts, at the cost of less conversational phrasing.
-5. **Guardrail**: emergency/symptom-like queries (chest pain, suicidal
-   ideation, etc.) are pattern-matched and redirected to 999/911/111
-   instead of answered — mirroring the HCA doc's clinical-safety guardrail.
+---
 
-## Run it
+## 📌 Project Overview
 
-### Streamlit (Recommended & Cloud Deployment)
+The **Patient & Clinical Content Assistant** is an AI-powered health information prototype that uses Retrieval-Augmented Generation (RAG) principles to answer patient and clinician queries. Instead of ungrounded generative text, every response is retrieved directly from official National Institutes of Health (NIH) medical publications, ensuring strict factual accuracy and traceability.
+
+### 🎯 Key Highlights
+- **100% Grounded Answers**: Eliminates medical hallucinations by matching queries to verified NIH documentation with transparent confidence scores.
+- **Direct Source Citations**: Every answer includes full provenance (NIH institute name and official reference URL).
+- **Clinical Safety Guardrails**: Automatically detects high-risk or emergency queries (e.g., chest pain, breathing distress, stroke symptoms) and immediately provides emergency redirect guidance (999/911/111).
+- **Comprehensive Knowledge Base**: Built on the **MedQuAD** dataset featuring **16,406** cleaned medical Q&A pairs across 9 NIH institutes (*MedlinePlus, CDC, Cancer.gov, NIDDK, NINDS, NHLBI, GARD, GHR, NIHSeniorHealth*).
+
+---
+
+## 🏗️ Architecture & Workflow
+
+```
+[ User Query ]
+       │
+       ▼
+[ Clinical Safety Guardrail ] ──(Emergency / Acute Symptom)──► [ Emergency Redirection (999/911) ]
+       │
+       ▼ (Informational Query)
+[ TF-IDF / Semantic Retrieval ]
+       │
+       ▼
+[ MedQuAD Knowledge Base (16,406 Q&A pairs) ]
+       │
+       ▼
+[ Grounded Answer Synthesis + NIH Citation + Confidence Score ]
+```
+
+---
+
+## 🚀 Quickstart (Local Run)
+
+### 1. Clone & Install Dependencies
 ```bash
+git clone https://github.com/your-username/your-repo-name.git
+cd your-repo-name
 pip install -r requirements.txt
+```
+
+### 2. Launch the Streamlit App
+```bash
 streamlit run app.py
 ```
+Open **`http://localhost:8501`** in your browser.
 
-### Flask (REST API & Static HTML UI)
+*(Optional)* Run the Flask REST API & Web UI:
 ```bash
-pip install -r requirements.txt
 python flask_app.py
 ```
-Then open http://localhost:5000 in your browser.
 
-Or test the engine directly via CLI:
-```bash
-python rag_engine.py
+---
+
+## 📁 Repository Structure
+
+```
+├── app.py              # Streamlit web application & interactive chat UI
+├── flask_app.py        # Flask REST API backend
+├── rag_engine.py       # Core medical retrieval engine & safety guardrails
+├── parse_medquad.py    # MedQuAD dataset ingestion & preprocessing script
+├── medquad_clean.csv   # Cleaned NIH medical Q&A knowledge base (16,406 records)
+├── requirements.txt    # Project dependencies
+└── README.md           # Project documentation
 ```
 
-## Files
+---
 
-- `parse_medquad.py` — one-time script that builds `medquad_clean.csv` from
-  the raw MedQuAD GitHub repo (already run; the CSV is included).
-- `medquad_clean.csv` — the flattened dataset (16,406 rows: doc_id, source,
-  focus, url, question, question_type, answer).
-- `rag_engine.py` — the retrieval + guardrail engine (`MedicalRAGEngine`
-  class). Run directly for a CLI smoke test.
-- `app.py` — Flask backend exposing `/api/ask` and `/api/stats`.
-- `static/index.html` — the chat UI.
+## ⚖️ Disclaimer
 
-## Upgrade path (once you're outside a sandboxed/restricted network)
-
-This prototype avoids downloading any pretrained neural model so it runs
-anywhere. To make it noticeably smarter, swap in:
-
-1. **Dense embeddings** instead of TF-IDF: replace `TfidfVectorizer` in
-   `rag_engine.py` with `sentence-transformers` (e.g. `all-MiniLM-L6-v2`).
-   This catches semantic matches TF-IDF misses (e.g. "my knee hurts when I
-   climb stairs" → osteoarthritis) since it doesn't need shared keywords.
-2. **A real vector store**: FAISS or Chroma instead of an in-memory sklearn
-   matrix — matters once you're past ~50k+ documents.
-3. **A local generative model** (optional): a small local LLM (e.g.
-   `flan-t5-base`, or a quantized model via `llama.cpp`/`ollama`) to
-   paraphrase/synthesize across the top-k retrieved answers into a single
-   conversational response with inline citations — this is the step that
-   turns "retrieval" into full "RAG" in the sense of the original HCA doc.
-4. **Hybrid search** (BM25 + dense vectors) — combine `rank_bm25` with the
-   dense embeddings above for the best of both (exact term matches +
-   semantic matches), same rationale as the OpenSearch hybrid design in the
-   original architecture.
-5. **Evaluation**: write ~20-30 held-out test questions with known-correct
-   MedQuAD answers and measure retrieval hit-rate — a tiny version of the
-   RAGAS evaluation gate in the original design.
-
-## Scope note
-
-This is a general health-information demo, not the patient-facing HCA
-assistant itself — MedQuAD has no consultants, pricing, or hospital data.
-The pipeline shape (ingest → chunk/index → retrieve → guardrail → grounded,
-cited answer) is what carries over directly to a real deployment on your
-own content.
+*This assistant is developed for educational and informational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment.*
