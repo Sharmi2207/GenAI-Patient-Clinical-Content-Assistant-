@@ -29,17 +29,22 @@ NHLBI, CDC). CC BY 4.0 licensed, from https://github.com/abachaa/MedQuAD.
 
 ## Run it
 
+### Streamlit (Recommended & Cloud Deployment)
 ```bash
-pip install pandas scikit-learn flask
-python3 app.py
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
+### Flask (REST API & Static HTML UI)
+```bash
+pip install -r requirements.txt
+python flask_app.py
+```
 Then open http://localhost:5000 in your browser.
 
-Or test the engine directly without the web UI:
-
+Or test the engine directly via CLI:
 ```bash
-python3 rag_engine.py
+python rag_engine.py
 ```
 
 ## Files
